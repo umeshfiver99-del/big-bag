@@ -4,6 +4,7 @@ import fs from "fs";
 import { zip } from "fflate";
 import { isLocalOrchestratorEnabled } from "@/lib/orchestrator-mode";
 import { isRoutableProjectSlug } from "@/lib/project-slug";
+import { authFailed, enforceProjectScope, resolveVcaasContext } from "@/app/api/vcaas/_shared";
 
 const IS_LOCAL_MODE = isLocalOrchestratorEnabled();
 
@@ -58,14 +59,20 @@ async function buildLocalZip(
 }
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params;
+  const auth = await resolveVcaasContext();
+  if (authFailed(auth)) return auth.response;
 
   if (!isRoutableProjectSlug(projectId)) {
     return NextResponse.json({ ok: false, error: "Invalid project id" }, { status: 400 });
   }
+
+
+  const outOfScope = await enforceProjectScope(auth.team, "GET", ["projects", projectId]);
+  if (outOfScope) return outOfScope;
 
   if (IS_LOCAL_MODE) {
     try {

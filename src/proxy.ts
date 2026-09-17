@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 const isProduction = process.env.NODE_ENV === "production";
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+const SESSION_COOKIE = "bigbag_session";
 // Extract origin from app URL (e.g. "https://my-app.com" from "https://my-app.com/")
 const appOrigin = appUrl ? new URL(appUrl).origin : "";
 // Optional: comma-separated list of additional allowed origins for custom deployments
@@ -50,9 +51,9 @@ function addCspHeaders(response: NextResponse) {
   return response;
 }
 
-// NOTE: Authentication has been removed — the platform is fully open and every
-// route is public. No user account is required. This proxy now only handles
-// CORS and CSP headers (needed for the live preview iframe and custom domains).
+// Page redirects are an early UX guard. Protected APIs still verify the signed
+// Firebase token and project ownership; cookie presence here is never treated as
+// authorization.
 export async function proxy(request: NextRequest) {
   // Handle CORS preflight requests
   if (request.method === "OPTIONS") {
@@ -62,7 +63,23 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Every route is public — just attach CORS + CSP headers and continue.
+  const pathname = request.nextUrl.pathname;
+  const firebaseConfigured = Boolean(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const protectedPage = pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname.startsWith("/project/");
+
+  if (firebaseConfigured && protectedPage && !hasSession) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (firebaseConfigured && pathname === "/login" && hasSession) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Public marketing pages and authenticated requests continue with the shared
+  // CORS + CSP headers.
   const response = NextResponse.next();
   addCorsHeaders(response, request);
   addCspHeaders(response);

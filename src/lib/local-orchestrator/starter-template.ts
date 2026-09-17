@@ -30,8 +30,8 @@ export const PREINSTALLED_DEPENDENCIES: Record<string, string> = {
 };
 
 export const PREINSTALLED_DEV_DEPENDENCIES: Record<string, string> = {
-  vite: "^5.4.21",
-  "@vitejs/plugin-react": "^4.7.0",
+  vite: "^8.3.0",
+  "@vitejs/plugin-react": "^6.1.1",
   typescript: "^5.8.0",
   "@types/node": "^22.0.0",
   "@types/react": "^19.0.0",

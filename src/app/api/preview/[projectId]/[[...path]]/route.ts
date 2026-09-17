@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import net from "net";
-import http from "http";
 
 import {
     authFailed,
@@ -339,7 +338,7 @@ async function handle(
         auth = await resolveVcaasContext();
         if (authFailed(auth)) return auth.response;
 
-        const outOfScope = enforceProjectScope(auth.team, "GET", ["projects", projectId]);
+        const outOfScope = await enforceProjectScope(auth.team, "GET", ["projects", projectId]);
         if (outOfScope) return outOfScope;
     }
 
