@@ -5,13 +5,11 @@ Next.js app, the user previews it live, edits it, and publishes it. **This repo 
 UI.** Everything heavy — the coding agent, sandboxes, hosting, database, deploys, custom
 domains, GitHub sync — is done by the **Totalum API** behind one API key.
 
-> **⚠️ NO AUTH BY DESIGN.** This project ships with no authentication — deliberately, so
-> whoever adopts it can add the auth that fits their system, or whatever they prefer.
-> Every route is public and the app acts on one API key, so anyone who can reach the URL
-> can use it and spend that key's credits. **If this is going online, an auth layer must
-> be in place first** — make the guards in `src/app/api/vcaas/_shared.ts` real and protect
-> the pages in `src/proxy.ts` (see "Boilerplate mode" below). Local or private-network use
-> without a login is fine.
+> **🔐 AUTHENTICATED PRODUCT MODE.** Firebase verifies Google ID tokens and Turso stores
+> the `projectId ↔ userId` ownership boundary. Every project API route must keep calling
+> the guards in `src/app/api/vcaas/_shared.ts`; the dashboard list must stay filtered by
+> that same mapping. Local orchestrator development may bypass login only when Firebase is
+> intentionally unconfigured.
 
 **Totalum API reference (read this before touching anything under `src/lib/vcaas*` or
 `src/app/api/`):** https://www.totalum.app/totalum-api.md — the whole core API in one
@@ -86,22 +84,23 @@ https://api-accounts.totalum.app/api/v1/vcaas   ← documented at totalum.app/to
 5. **New endpoint?** Add the typed function in `vcaas.ts`, the type in `vcaas-types.ts`, and let the catch-all proxy carry it. Only add a dedicated route under `src/app/api/vcaas/` when the request is not plain JSON (uploads, downloads).
 6. **New user-facing string?** Add the key to totalum-platform's `en.ts` first, then copy the file here. Do not fork the dictionary.
    **⚠️ BUT NEVER RE-COPY `en.ts` WHOLESALE TO PICK UP A FEW KEYS.** This dictionary carries deliberate local values — `workspace.serverWake.startingTitle` is "Your project **server** is still starting" here, and the credit copy names this app's own minimum — and a blind overwrite silently reverts every one of them while also importing unrelated platform copy changes. Copy the individual keys you need, or diff `git diff HEAD -- src/i18n/en.ts` afterwards and put the local values back.
-8. **The proxy holds an account-wide key and the app has no login.** Two rules follow, and both are load-bearing security, not style:
+8. **The proxy holds an account-wide key behind per-user login.** Three rules follow, and all are load-bearing security, not style:
+   - **Every project request must pass Firebase identity and Turso/local ownership checks.** Never rely on a hidden page or a client-side filter. New projects must record their owner before the browser receives them, deleted projects must release the mapping, and `GET /projects` must remain owner-filtered.
    - **Every proxied path must stay inside `/api/v1/vcaas/`.** `vcaas-server.ts`'s `resolveVcaasUrl` resolves the final URL and refuses anything that escapes. Route params arrive decoded, so a traversal segment can otherwise survive into the joined path and `fetch` normalise it onto another part of the account API the key authorises. Never build an upstream URL any other way.
    - **Any server route that fetches a client-supplied URL is an SSRF hole until it calls `publicUrlRejectionReason` (async, resolves DNS) from `lib/safe-url.ts`, with `redirect: "error"` and a timeout.** The sync `urlRejectionReason` is for IP literals only. Both cover IPv4-mapped IPv6 (`::ffff:169.254.169.254`) and every private range; a plain host allowlist does not, because a redirect or a rebinding DNS name walks straight past it.
 
 
 ## Dependencies & security
 
-- **This UI ships no auth / payment / AI SDK.** `better-auth`, `stripe`, `bcrypt`, `jsonwebtoken`, `date-fns`, `recharts`, the AI SDK and their `@types` were listed but never imported and were removed. The builder is a thin client in front of one key; those belong in **boilerplate mode**, added by the operator. Before adding a dependency, confirm it is actually imported.
-- **Runtime deps** are UI/utility only: Next 16, React 19, Tailwind 4, Radix UI, `lucide-react`, `sonner`, `cmdk`, `next-themes`, cva/clsx/tailwind-merge, `@monaco-editor/react`, `react-hook-form`, `react-day-picker`, `fflate`.
+- **Authentication dependencies are intentional.** `firebase` owns browser sign-in and `firebase-admin` verifies ID tokens on the server. Turso project ownership uses the existing `@libsql/client` dependency.
+- **Runtime deps** otherwise remain UI/utility focused: Next 16, React 19, Tailwind 4, Radix UI, `lucide-react`, `sonner`, `cmdk`, `next-themes`, cva/clsx/tailwind-merge, Monaco, forms, and `fflate`.
 - **Keep `npm audit` at zero.** A `dompurify` override (`>=3.4.15`) pins the copy Monaco pulls in. Run `npm audit` after any dependency change; do not commit a new advisory.
 
 7. **Mobile and desktop layouts are both mounted** in the workspace page (hidden by CSS). Only the desktop `PreviewPanel` gets `frameRef`; only the desktop `ChatPanel` gets the visual-editor pencil. Anything the composer *holds* (the prompt, the attachments) must therefore be page state passed down, never `useState` inside `ChatPanel` — two mounted copies would drift, and sending on one would leave the other's chips behind.
 
 ## Common next steps
 
-- **Put real users behind it:** see "Boilerplate mode" below — the guards live in `src/app/api/vcaas/_shared.ts`.
+- **Adjust identity or tenancy:** start with `src/app/api/vcaas/_shared.ts` and `src/lib/project-ownership.ts`; never weaken the server-side checks.
 - **Rebrand / white-label:** `src/app/layout.tsx` (metadata), `src/app/page.tsx` header, `src/app/icon.svg`, `globals.css` tokens. Remove `InsufficientCreditsModal`'s billing link before selling to customers — it points at the operator's account.
 - **Add a workspace capability:** check the endpoint in the API reference above → `vcaas.ts` + types → a `*Modal.tsx` (use `components/primitives/Modal`) → mount it in the workspace page under `openModal`.
 - **Add a language:** replace the frozen `useLocale()` in `i18n/index.ts` with the platform's `LocaleProvider` and add `es.ts`.
@@ -119,18 +118,16 @@ This repo is the reference implementation. Two ways to use it:
 
 Credits are the key owner's. If you resell, meter your users yourself (next section) and keep `GET /api/v1/vcaas/account` in view.
 
-## Boilerplate mode: login with Supabase, payments with Stripe
+## Boilerplate mode: login with Firebase and project ownership
 
-Today the app is single-tenant: one key, no login, and the route guards in `src/app/api/vcaas/_shared.ts` always answer "yes". To ship it as a product:
+The repository includes Google login through Firebase plus a Turso ownership table. To ship it as a product, configure the public Firebase values, enable Google in Firebase Authentication, add the deployed hostname to Authorized Domains, and provide the Turso URL/token. Keep Stripe as an optional billing extension:
 
-**Login and database (Supabase recommended, but you can choose another provider)**
-1. `npm i @supabase/supabase-js @supabase/ssr`. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server only).
-2. Tables (RLS on): `profiles(user_id uuid pk, credits integer default 0)`, `projects(project_id text pk, user_id uuid, created_at)`.
-3. `src/lib/supabase/server.ts`: `createServerClient` reading the request cookies. A `/login` page with magic link or OAuth.
-4. `_shared.ts` — make the two guards real: `resolveVcaasContext()` reads the Supabase user from cookies and returns `401` when absent, else `{ ok: true, ctx: { accountUserId: user.id }, team: { userId } }`. `enforceProjectScope(team, method, path)` returns `403` when `path[0] === "projects" && path[1]` and `projects.user_id !== team.userId`. After a successful `POST /projects` or `/projects/launch`, insert the returned `projectId` for that user.
-5. **Wire the guards into every route.** Only `/api/preview/*` and `/api/visual-edit/*` call them today; `src/app/api/vcaas/[...path]`, `upload`, `source-code` and `git-diff` do not. Add the two calls at the top of each handler.
-6. Filter the dashboard: intersect `vcaasApi.projects.list()` with the user's `projects` rows (do it in the catch-all route for `GET /projects`, so the client stays a copy).
-7. Protect pages in `src/proxy.ts`: redirect `/` and `/project/*` to `/login` without a session.
+**Login and database**
+1. Browser auth lives in `src/components/auth/AuthProvider.tsx` and `src/lib/firebase-client.ts`; the server exchanges the fresh ID token for an HTTP-only, same-site cookie at `src/app/api/auth/session/route.ts`.
+2. `src/lib/firebase-admin.ts` verifies the token signature, audience, issuer and expiry. `resolveVcaasContext()` never trusts a user id sent by the browser.
+3. `src/lib/project-ownership.ts` creates and queries `bigbag_project_owners(project_id, user_id, created_at)` in Turso. The ownership store is checked before an upstream project is created so an outage cannot knowingly create an invisible project.
+4. Every project-bearing API route calls `enforceProjectScope`; `GET /projects` intersects the upstream list with the signed-in user's ids. Creation records the returned id, not the requested slug, and deletion releases the mapping.
+5. `src/proxy.ts` redirects protected pages when the session cookie is absent. This is only an early UI gate: the API verification and ownership lookup remain authoritative.
 
 **Payments (Stripe recommended, but you can choose another provider)**
 1. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_*` for credit packs or a plan.

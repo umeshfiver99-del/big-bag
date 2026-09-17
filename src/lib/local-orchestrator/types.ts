@@ -1,16 +1,8 @@
-import type {
-  VcaasProject,
-  VcaasProjectSummary,
-  AgentStatus,
-  ConversationMessage,
-  FileTree,
-  FileTreeEntry,
-  FileContent,
-  FileWriteResult,
-} from "@/lib/vcaas-types";
+import type { ConversationMessage } from "@/lib/vcaas-types";
 
 export interface LocalProjectRecord {
   projectId: string;
+  ownerId: string;
   label?: string;
   description: string;
   createdAt: string;

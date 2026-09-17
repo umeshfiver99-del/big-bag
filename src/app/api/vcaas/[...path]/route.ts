@@ -8,22 +8,24 @@ import { normalizeVcaasError, toErrorEnvelope } from "@/lib/vcaas-errors";
 import { isPromptEndpoint, injectDesignPrompt } from "@/lib/design-system-prompt";
 import { isLocalOrchestratorEnabled } from "@/lib/orchestrator-mode";
 import { isRoutableProjectSlug } from "@/lib/project-slug";
+import { authFailed, enforceProjectScope, resolveVcaasContext } from "../_shared";
+import { ownedProjectIds, registerProjectOwner, removeProjectOwner } from "@/lib/project-ownership";
 
 const IS_LOCAL_MODE = isLocalOrchestratorEnabled();
 
-async function handleLocalRequest(req: NextRequest, path: string[]) {
+async function handleLocalRequest(req: NextRequest, path: string[], userId: string) {
   const method = req.method.toUpperCase();
   const url = new URL(req.url);
 
   // 1. Projects collection: /projects or /projects/launch
   if (path[0] === "projects" && path.length === 1) {
     if (method === "GET") {
-      const list = localProjectStore.list();
+      const list = localProjectStore.list(userId);
       return NextResponse.json({ ok: true, data: list }, { status: 200 });
     }
     if (method === "POST") {
       const body = await req.json().catch(() => ({}));
-      const proj = localProjectStore.create(body);
+      const proj = localProjectStore.create({ ...body, ownerId: userId });
       return NextResponse.json({ ok: true, data: proj }, { status: 200 });
     }
   }
@@ -35,6 +37,7 @@ async function handleLocalRequest(req: NextRequest, path: string[]) {
       projectId: body.projectId || `app-${Date.now().toString().slice(-4)}`,
       description: body.prompt || body.description || "Web Application",
       label: body.label || body.projectId,
+      ownerId: userId,
     });
 
     // Start background agent run & dev sandbox
@@ -234,10 +237,21 @@ async function handleRequest(
 ) {
   try {
     const { path } = await params;
+    const auth = await resolveVcaasContext();
+    if (authFailed(auth)) return auth.response;
+
+    const outOfScope = await enforceProjectScope(auth.team, req.method, path);
+    if (outOfScope) return outOfScope;
 
     // Route to local orchestrator when in local mode
     if (IS_LOCAL_MODE) {
-      return await handleLocalRequest(req, path);
+      return await handleLocalRequest(req, path, auth.team.userId);
+    }
+
+    // Fail before a credit-spending create if the ownership store is unavailable;
+    // otherwise a successful upstream project could become an invisible orphan.
+    if (req.method === "POST" && path[0] === "projects" && (path.length === 1 || path[1] === "launch")) {
+      await ownedProjectIds(auth.team.userId);
     }
 
     // Upstream Totalum fallback
@@ -272,7 +286,24 @@ async function handleRequest(
       return NextResponse.json(toErrorEnvelope(normalized), { status: normalized.status });
     }
 
-    return NextResponse.json({ ok: true, data: json.data }, { status: 200 });
+    let data = json.data;
+    if (req.method === "GET" && path[0] === "projects" && path.length === 1 && Array.isArray(data)) {
+      const allowed = await ownedProjectIds(auth.team.userId);
+      data = data.filter((project: { projectId?: string }) => project.projectId && allowed.has(project.projectId));
+    }
+
+    if (req.method === "POST" && path[0] === "projects" && (path.length === 1 || path[1] === "launch")) {
+      const projectId = data && typeof data === "object" && "projectId" in data
+        ? String((data as { projectId: unknown }).projectId)
+        : "";
+      if (projectId) await registerProjectOwner(projectId, auth.team.userId);
+    }
+
+    if (req.method === "DELETE" && path[0] === "projects" && path.length === 2) {
+      await removeProjectOwner(path[1], auth.team.userId);
+    }
+
+    return NextResponse.json({ ok: true, data }, { status: 200 });
   } catch (error) {
     if (error instanceof VcaasPathError) {
       return NextResponse.json(

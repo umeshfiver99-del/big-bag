@@ -32,8 +32,6 @@ function saveProjects(projects: Record<string, LocalProjectRecord>): void {
   fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2), "utf-8");
 }
 
-let nextPort = 3001;
-
 function allocatePort(existing: Record<string, LocalProjectRecord>): number {
   const usedPorts = new Set(Object.values(existing).map((p) => p.port));
   let port = 3001;
@@ -82,9 +80,9 @@ export const localProjectStore = {
     return dir;
   },
 
-  list(): VcaasProjectSummary[] {
+  list(ownerId: string): VcaasProjectSummary[] {
     const projects = readProjects();
-    return Object.values(projects).map((p) => ({
+    return Object.values(projects).filter((p) => p.ownerId === ownerId).map((p) => ({
       projectId: p.projectId,
       label: p.label || p.projectId,
       description: p.description,
@@ -105,7 +103,7 @@ export const localProjectStore = {
     return projects[projectId] || null;
   },
 
-  create(body: { projectId: string; description: string; label?: string }): VcaasProject {
+  create(body: { projectId: string; description: string; label?: string; ownerId: string }): VcaasProject {
     const projects = readProjects();
     let id = body.projectId.toLowerCase().replace(/[^a-z0-9-]/g, "-");
     if (!id || id === "-") id = `app-${Date.now()}`;
@@ -121,6 +119,7 @@ export const localProjectStore = {
     const now = new Date().toISOString();
     const record: LocalProjectRecord = {
       projectId: uniqueId,
+      ownerId: body.ownerId,
       label: body.label || body.description.slice(0, 30) || uniqueId,
       description: body.description,
       createdAt: now,
@@ -167,5 +166,9 @@ export const localProjectStore = {
       console.warn("Could not delete directory:", dir, e);
     }
     return true;
+  },
+
+  isOwnedBy(projectId: string, userId: string): boolean {
+    return readProjects()[projectId]?.ownerId === userId;
   },
 };

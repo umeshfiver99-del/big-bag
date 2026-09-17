@@ -139,16 +139,13 @@ cp .env.example .env.local
 
 This is a standard Next.js app with no platform lock-in. It runs wherever Next.js runs.
 
-> ### ⚠️ Important: this project ships with NO authentication
+> ### 🔐 Google authentication and private projects
 >
-> That is on purpose — we want you to add the auth that fits how your system works, or
-> however you prefer. Out of the box every route is public and the app acts on a single
-> API key, so **anyone who can reach the URL can use it and spend that key's credits.**
->
-> **Before you publish this anywhere public, put an auth layer in front of it.** The
-> hooks are already there: make the two guards in `src/app/api/vcaas/_shared.ts` real and
-> protect the pages in `src/proxy.ts`. See [Use it as a boilerplate](#use-it-as-a-boilerplate-login--payments) for the step-by-step. Running it locally or on a private
-> network with no login is fine.
+> Configure Firebase Authentication and Turso with the values documented in
+> `.env.example`. Google ID tokens are verified on the server, the dashboard list is
+> filtered by owner, and every project route enforces the same ownership mapping. Local
+> development remains available without login when the local orchestrator is enabled and
+> Firebase is intentionally left unconfigured.
 
 ### Vercel, one click
 
@@ -178,7 +175,7 @@ This is not only a standalone tool. It is a drop-in AI app-builder layer for a S
 
 > **The pitch to your customers:** *"Build and ship a full-stack app right here, inside our platform."*
 
-> ⚠️ **Before you put real users behind it, read `src/app/api/vcaas/_shared.ts`.** This app runs on one API key, so "who is asking?" and "may they touch this project?" are answered with "yes" by default. That file is where you add your own auth and ownership checks. The API routes already delegate the decision to it.
+> **Before deploying, read `src/app/api/vcaas/_shared.ts`.** The app runs on one upstream key, so the Firebase identity and Turso ownership checks there are the boundary that separates each user's projects.
 
 ### Two ways to integrate
 
@@ -187,7 +184,7 @@ This is not only a standalone tool. It is a drop-in AI app-builder layer for a S
 
 ### Use it as a boilerplate: login + payments
 
-Want to ship this as your own product? Add an auth provider such as **Supabase** for login (a `profiles` and a `projects` table, make the two guards in `_shared.ts` real, protect the pages in `src/proxy.ts`) and **Stripe** for payments (checkout for credit packs or a plan, a webhook that tops up `profiles.credits`, a 402 on spend-shaped calls when the balance is empty, which the UI already turns into a "buy credits" dialog). The concrete checklist is in [`AGENTS.md`](AGENTS.md#boilerplate-mode-login-with-supabase-payments-with-stripe).
+Google login and per-user project ownership are included through Firebase and Turso. Add **Stripe** if you want paid plans or credit packs; the existing insufficient-credit UI can be connected to your checkout flow. The concrete extension checklist is in [`AGENTS.md`](AGENTS.md#boilerplate-mode-login-with-firebase-and-project-ownership).
 
 ---
 
@@ -196,11 +193,11 @@ Want to ship this as your own product? Add an auth provider such as **Supabase**
 Two different things live here, and it is worth keeping them apart:
 
 - **The apps the AI builds for you** come with a managed database, hosting, auth and everything else they need to run — all provided by the BigBag AI Engine. Nothing to install.
-- **This builder UI itself** is deliberately lean. It ships no auth, payment or AI SDK, because it needs none: it is a thin client in front of one API key. When you turn it into your own product you add exactly the providers you want — the step-by-step is in [`AGENTS.md`](AGENTS.md#boilerplate-mode-login-with-supabase-payments-with-stripe):
+- **This builder UI itself** uses Firebase for Google identity and Turso for project ownership. It remains a thin client in front of one server-held AI key:
 
-  - **Auth**: Supabase Auth, Better Auth, Clerk, Auth0 or your own.
+  - **Auth**: Firebase Authentication with Google sign-in.
   - **Payments**: Stripe, or any provider — for credit packs or plans.
-  - **Database (for your own users/billing)**: Supabase, Postgres, PlanetScale, MongoDB, anything.
+  - **Database (for project ownership)**: Turso/libSQL.
 
 Add a provider by installing its SDK and setting its key in the **Secrets** panel.
 
