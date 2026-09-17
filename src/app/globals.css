@@ -401,3 +401,158 @@ button {
 .pricing-featured > div > span { color: #b7f36b !important; }
 .pricing-grid .pricing-featured p,
 .pricing-grid .pricing-featured strong small { color: #c4c8ce !important; }
+
+/* Brand mark: the product uses one code-native symbol everywhere, never a bag. */
+.bigbag-brand { color: inherit; }
+.bigbag-code-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9px;
+  background: #2257e7;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 6px 16px rgba(34,87,231,.18);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: -.12em;
+  line-height: 1;
+}
+.bigbag-code-mark.w-8 { font-size: 10px; }
+.bigbag-code-mark.w-10 { border-radius: 11px; font-size: 12px; }
+.bigbag-wordmark { color: inherit; letter-spacing: -.055em; line-height: 1; }
+.site-header .bigbag-brand { color: #111318; }
+.site-footer .bigbag-brand { color: #fff; }
+
+.header-theme-toggle { height: 40px; min-width: 40px; border-color: #d8dbe1; background: #fff; }
+.login-theme-toggle { position: absolute; top: 28px; right: 28px; z-index: 2; }
+.sample-page-actions { display:flex; align-items:center; gap:13px; }
+.sample-page-actions > a { display:flex; gap:8px; align-items:center; color:#b7f36b; }
+.sample-theme-toggle { border-color:rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:white; }
+.login-panel { position:relative; }
+.login-prompt-note { margin-top:18px; padding:11px 12px; display:flex; align-items:center; gap:8px; border-radius:9px; background:#f1f4ff; color:#31415e !important; font-size:12px !important; }
+.login-prompt-note svg { color:#2257e7; flex:none; }
+
+/* Connector artwork is layered over a deterministic initial. If a remote
+   favicon is unavailable there is still a polished local fallback. */
+.connector-logo { position:relative; isolation:isolate; }
+.connector-logo b { position:absolute; inset:0; display:grid; place-items:center; z-index:0; }
+.connector-logo img { position:relative; z-index:1; object-fit:contain; background:white; }
+
+/* Complete dark palette for marketing, authentication, and the sample app. */
+.dark .marketing-page { background:#0d1016; color:#f2f4f8; }
+.dark .site-header { border-color:#292e39; background:rgba(13,16,22,.88); }
+.dark .site-header .bigbag-brand { color:#fff; }
+.dark .site-nav a { color:#a9afbb; }
+.dark .site-nav a:hover,
+.dark .site-nav a[aria-current="page"] { color:#fff; }
+.dark .header-theme-toggle { border-color:#303644; background:#161a23; }
+.dark .button-quiet { color:#d4d8e0; }
+.dark .button-ink { background:#f4f6fa; color:#101218; }
+.dark .icon-action { border-color:#303644; background:#161a23; color:#d4d8e0; }
+.dark .mobile-nav { border-color:#292e39; background:#11151d; }
+.dark .mobile-nav a { border-color:#292e39; }
+.dark .hero-note,
+.dark .hero-lede,
+.dark .hero-fineprint,
+.dark .split-heading > p,
+.dark .directory-hero > span { color:#aeb4c0; }
+.dark .keyboard-hint,
+.dark .prompt-suggestions > span { color:#b8bec8; }
+.dark .section-heading > div > p,
+.dark .directory-hero > p,
+.dark .connector-heading-side a,
+.dark .mini-conversation span { color:#7fa2ff; }
+.dark .hero-composer { background:#151a23; border-color:#343b49; box-shadow:0 20px 60px rgba(0,0,0,.28); }
+.dark .hero-composer > label { color:#aeb4c0; }
+.dark .hero-composer textarea { color:#f4f6fa; }
+.dark .hero-composer-actions,
+.dark .prompt-suggestions { border-color:#303643; }
+.dark .prompt-suggestions { background:#11151d; }
+.dark .prompt-suggestions button { background:#1b202a; border-color:#343b49; color:#c8cdd6; }
+.dark .composer-tool { color:#b5bbc6; }
+.dark .composer-tool:hover { background:#202631; }
+.dark .proof-bar { border-color:#303642; }
+.dark .proof-bar span { color:#c1c6d0; border-color:#303642; }
+.dark .workflow-feature { background:#151a23; border-color:#303744; }
+.dark .workflow-feature-large { background:#17213c; }
+.dark .workflow-feature-dark { background:#080a0f; border-color:#252a34; }
+.dark .workflow-feature p { color:#b1b7c2; }
+.dark .feature-icon { background:#252b35; }
+.dark .mini-conversation { background:#0f131b; }
+.dark .mini-conversation p { color:#f1f3f7; }
+.dark .connector-grid { border-color:#303642; }
+.dark .connector-card { background:#151a23; border-color:#303642; }
+.dark .connector-card:hover { background:#1a2440; }
+.dark .connector-logo { background:#fff; border-color:#404754; }
+.dark .connector-card small { color:#aeb4bf; }
+.dark .connector-search { border-color:#555e6c; }
+.dark .connector-search input { color:#f2f4f8; }
+.dark .connector-filters button { border-color:#343b48; background:#161b24; color:#b7bdc8; }
+.dark .connector-filters button[aria-pressed="true"] { background:#f2f4f8; border-color:#f2f4f8; color:#11141a; }
+.dark .connector-empty { border-color:#3b4350; color:#adb4c0; }
+.dark .final-cta { background:#121720; }
+.dark .final-cta p { color:#adb4c0; }
+.dark .final-cta-mark { background:#2257e7; }
+.dark .pricing-grid article,
+.dark .info-grid article { background:#151a23; border-color:#303642; }
+.dark .pricing-grid .pricing-featured { background:#07090d; border-color:#303642; }
+.dark .pricing-grid p,
+.dark .pricing-grid strong small,
+.dark .pricing-note,
+.dark .info-grid p { color:#aeb4c0 !important; }
+.dark .pricing-grid ul { border-color:#303642; }
+.dark .info-grid { border-color:#303642; }
+.dark .contact-form input,
+.dark .contact-form textarea { background:#151a23; border-color:#343b48; color:#f2f4f8; }
+.dark .button-paper { background:#f2f4f8; color:#11141a; border-color:#f2f4f8; }
+
+.dark .login-page { background:#0d1016; color:#f2f4f8; }
+.dark .login-story { background:#183a9b; }
+.dark .login-card { background:#151a23; border-color:#303744; box-shadow:0 28px 80px rgba(0,0,0,.32); }
+.dark .login-card > p { color:#b5bbc6 !important; }
+.dark .login-prompt-note { background:#1b2744; color:#dce4f8 !important; }
+.dark .login-lock { background:#1c2b52; }
+.dark .google-button { background:#f5f6f8; color:#12151b; border-color:#f5f6f8; }
+.dark .google-button:hover { background:#fff; }
+.dark .login-card .login-terms { color:#929aa7 !important; }
+
+.dark .sample-page { background:#090c11; color:#edf0f4; }
+.dark .sample-app { background:#11161d; border-color:#2d3540; box-shadow:0 22px 70px rgba(0,0,0,.42); }
+.dark .sample-topbar,
+.dark .sample-stat-grid article,
+.dark .sample-projects,
+.dark .sample-activity { background:#171d25; border-color:#303843; }
+.dark .sample-topbar { border-color:#303843; }
+.dark .sample-topbar input { color:#edf0f4; }
+.dark .sample-topbar .sample-user { color:#243127; }
+.dark .sample-notification { border-color:#3a434f; }
+.dark .sample-title p,
+.dark .sample-stat-grid small,
+.dark .sample-projects header p,
+.dark .sample-projects article p small,
+.dark .sample-projects time,
+.dark .activity-time time,
+.dark .sample-activity article small,
+.dark .sample-task small { color:#aeb5bf; }
+.dark .sample-stat-grid em { color:#91cba2; }
+.dark .sample-projects header button,
+.dark .sample-activity header button,
+.dark .sample-table-header { color:#b8bec7; }
+.dark .sample-stat-grid article > span,
+.dark .sample-table-header,
+.dark .sample-task { background:#222933; }
+.dark .sample-projects > header,
+.dark .sample-activity > header,
+.dark .sample-projects > article { border-color:#303843; }
+.dark .sample-projects > article em { background:#27303a; color:#c7cdd6; }
+.dark .sample-activity > article { border-color:#343d49; }
+
+@media (max-width:700px) {
+  .login-theme-toggle { top:18px; right:18px; }
+  .sample-page-actions { gap:8px; }
+  .sample-theme-toggle { height:32px; min-width:32px; padding:0 7px; }
+  .site-actions > .button-quiet,
+  .site-actions > .button-ink,
+  .site-actions > .icon-action { display:none; }
+}

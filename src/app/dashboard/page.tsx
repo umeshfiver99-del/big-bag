@@ -41,6 +41,17 @@ type SortKey = "date-desc" | "date-asc" | "name-asc" | "name-desc";
 
 const PAGE_SIZE = 20;
 const VIEW_MODE_KEY = "bigbag:dashboard-view";
+const projectDateFormatter = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+function formatProjectDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown" : projectDateFormatter.format(date);
+}
 
 
 // --- Deterministic gradient + initials for the placeholder thumbnail ---
@@ -126,6 +137,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<VcaasProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [firstPrompt, setFirstPrompt] = useState("");
+  const [promptRestored, setPromptRestored] = useState(false);
   const [keyConfigured, setKeyConfigured] = useState<boolean | null>(null);
 
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; imageDescription: string; file: File }[]>([]);
@@ -178,6 +190,7 @@ export default function DashboardPage() {
       const prompt = sessionStorage.getItem("bigbag:landingPrompt");
       if (prompt) {
         setFirstPrompt(prompt);
+        setPromptRestored(true);
         sessionStorage.removeItem("bigbag:landingPrompt");
         window.setTimeout(() => heroTextareaRef.current?.focus(), 0);
       }
@@ -453,6 +466,13 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {promptRestored && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/[0.06] px-3.5 py-2.5 text-xs text-foreground" role="status">
+                  <span><strong className="font-semibold">Prompt restored.</strong> Review it, then choose Start build.</span>
+                  <button type="button" onClick={() => setPromptRestored(false)} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="Dismiss prompt restored message"><X className="size-3.5" /></button>
+                </div>
+              )}
+
               {keyConfigured === false && <SetupBanners />}
             </div>
           </div>
@@ -596,7 +616,7 @@ export default function DashboardPage() {
                           <p className="text-[11px] text-muted-foreground line-clamp-1">{p.description || "No description"}</p>
                         </div>
                         <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
-                          <span className="text-[10px] text-muted-foreground">{new Date(p.createdAt).toLocaleDateString()}</span>
+                          <time dateTime={p.createdAt} className="text-[10px] text-muted-foreground">{formatProjectDate(p.createdAt)}</time>
                           <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
                       </div>
@@ -637,7 +657,7 @@ export default function DashboardPage() {
                             <span className="text-xs text-muted-foreground line-clamp-1 max-w-[280px]">{p.description || "No description"}</span>
                           </td>
                           <td className="px-2 py-2 whitespace-nowrap">
-                            <span className="text-xs text-muted-foreground">{new Date(p.createdAt).toLocaleDateString()}</span>
+                            <time dateTime={p.createdAt} className="text-xs text-muted-foreground">{formatProjectDate(p.createdAt)}</time>
                           </td>
                           <td className="px-4 py-2 text-right">
                             <DropdownMenu>

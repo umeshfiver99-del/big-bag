@@ -19,7 +19,7 @@ export function SiteFooter() {
           <Link href="/enterprise">Enterprise</Link>
         </div>
         <div className="footer-meta">
-          <span>© {new Date().getFullYear()} BigBag</span>
+          <span>© BigBag</span>
           <Link href="/report-bug">Report a bug</Link>
         </div>
       </div>
