@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, PanelsTopLeft, X } from "lucide-react";
 import { useState } from "react";
 import { BigBagLogo } from "@/components/BigBagLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 const links = [
@@ -36,6 +37,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="site-actions">
+          <ThemeToggle className="header-theme-toggle" />
           {user ? (
             <>
               <Link className="button-quiet hidden sm:inline-flex" href="/dashboard">

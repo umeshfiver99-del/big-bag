@@ -37,11 +37,11 @@ export function LandingComposer() {
         rows={4}
       />
       <div className="hero-composer-actions">
-        <button className="composer-tool" title="Attachments become available in your workspace" aria-label="Attachments become available in your workspace">
+        <button type="button" className="composer-tool" title="Attachments become available after sign in" aria-label="Attachments become available after sign in" disabled>
           <Paperclip className="size-4" />
         </button>
         <span className="keyboard-hint"><Command className="size-3" /> Enter</span>
-        <button className="composer-submit" onClick={continueToBuilder} disabled={!prompt.trim()}>
+        <button type="button" className="composer-submit" onClick={continueToBuilder} disabled={!prompt.trim()}>
           Build this app <ArrowUp className="size-4" />
         </button>
       </div>

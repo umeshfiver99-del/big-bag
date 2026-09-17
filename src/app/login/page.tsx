@@ -6,6 +6,7 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useState } from "react";
 import { ArrowLeft, Check, LoaderCircle, ShieldCheck } from "lucide-react";
 import { BigBagLogo } from "@/components/BigBagLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { firebaseAuth, firebaseConfigured } from "@/lib/firebase-client";
 
 export default function LoginPage() {
@@ -61,10 +62,12 @@ export default function LoginPage() {
       </section>
 
       <section className="login-panel" aria-label="Sign in">
+        <ThemeToggle className="login-theme-toggle" />
         <div className="login-card">
           <div className="login-lock"><ShieldCheck /></div>
           <h2>Continue to BigBag</h2>
           <p>Use Google to enter your private builder workspace.</p>
+          <p className="login-prompt-note"><Check className="size-4" /> Your landing-page prompt will be waiting in the workspace.</p>
           <button className="google-button" onClick={signIn} disabled={loading || !firebaseConfigured}>
             {loading ? <LoaderCircle className="size-5 animate-spin" /> : <GoogleMark />}
             {loading ? "Signing you in…" : "Continue with Google"}
