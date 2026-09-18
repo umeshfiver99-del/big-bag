@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const isProduction = process.env.NODE_ENV === "production";
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+const appUrl = process.env["NEXT_PUBLIC_APP_URL"] || "";
 const SESSION_COOKIE = "bigbag_session";
 // Extract origin from app URL (e.g. "https://my-app.com" from "https://my-app.com/")
 const appOrigin = appUrl ? new URL(appUrl).origin : "";
@@ -64,7 +64,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname;
-  const firebaseConfigured = Boolean(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+  const firebaseConfigured = Boolean(process.env["NEXT_PUBLIC_FIREBASE_PROJECT_ID"]);
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
   const protectedPage = pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname.startsWith("/project/");
 

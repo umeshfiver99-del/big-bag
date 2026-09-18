@@ -1,26 +1,40 @@
 "use client";
 
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, type Auth } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-};
+interface FirebasePublicConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+  measurementId: string;
+}
 
-export const firebaseConfigured = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId,
-);
+interface FirebaseConfigResponse {
+  ok: boolean;
+  data?: {
+    configured: boolean;
+    config: FirebasePublicConfig | null;
+  };
+}
 
-export const firebaseApp = firebaseConfigured
-  ? getApps().length > 0
-    ? getApp()
-    : initializeApp(firebaseConfig)
-  : null;
+let authPromise: Promise<Auth | null> | null = null;
 
-export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
+export function getFirebaseAuth(): Promise<Auth | null> {
+  authPromise ??= (async () => {
+    const response = await fetch("/api/auth/config", { cache: "no-store" });
+    if (!response.ok) throw new Error("Firebase configuration request failed");
+
+    const payload = await response.json() as FirebaseConfigResponse;
+    const config = payload.data?.config;
+    if (!payload.ok || !payload.data?.configured || !config) return null;
+
+    const app = getApps().length > 0 ? getApp() : initializeApp(config);
+    return getAuth(app);
+  })();
+
+  return authPromise;
+}

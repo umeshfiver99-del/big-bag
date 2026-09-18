@@ -7,17 +7,20 @@ import { useState } from "react";
 import { ArrowLeft, Check, LoaderCircle, ShieldCheck } from "lucide-react";
 import { BigBagLogo } from "@/components/BigBagLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { firebaseAuth, firebaseConfigured } from "@/lib/firebase-client";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getFirebaseAuth } from "@/lib/firebase-client";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { configured, configurationError, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const signIn = async () => {
+    const firebaseAuth = await getFirebaseAuth().catch(() => null);
     if (!firebaseAuth) {
-      setError("Google sign-in is not configured for this deployment yet.");
+      setError("Google sign-in configuration could not be loaded. Refresh the page and try again.");
       return;
     }
     setLoading(true);
@@ -34,10 +37,7 @@ export default function LoginPage() {
       router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
       router.refresh();
     } catch (reason) {
-      const message = reason instanceof Error && reason.message.includes("popup-closed")
-        ? "The sign-in window was closed. Try again when you are ready."
-        : "Google sign-in could not be completed. Check your Firebase authorized domains.";
-      setError(message);
+      setError(signInErrorMessage(reason));
     } finally {
       setLoading(false);
     }
@@ -68,17 +68,35 @@ export default function LoginPage() {
           <h2>Continue to BigBag</h2>
           <p>Use Google to enter your private builder workspace.</p>
           <p className="login-prompt-note"><Check className="size-4" /> Your landing-page prompt will be waiting in the workspace.</p>
-          <button className="google-button" onClick={signIn} disabled={loading || !firebaseConfigured}>
-            {loading ? <LoaderCircle className="size-5 animate-spin" /> : <GoogleMark />}
-            {loading ? "Signing you in…" : "Continue with Google"}
+          <button className="google-button" onClick={signIn} disabled={loading || authLoading || !configured}>
+            {loading || authLoading ? <LoaderCircle className="size-5 animate-spin" /> : <GoogleMark />}
+            {loading ? "Signing you in…" : authLoading ? "Preparing sign-in…" : "Continue with Google"}
           </button>
-          {!firebaseConfigured && <p className="login-notice">Add the Firebase public configuration to enable sign-in.</p>}
+          {!authLoading && !configured && !configurationError && <p className="login-notice">Add the Firebase public configuration to enable sign-in.</p>}
+          {!authLoading && configurationError && <p className="login-error" role="alert">Sign-in configuration could not be loaded. Refresh the page to retry.</p>}
           {error && <p className="login-error" role="alert">{error}</p>}
           <p className="login-terms">By continuing, you agree to keep your generated apps lawful and secure.</p>
         </div>
       </section>
     </main>
   );
+}
+
+function signInErrorMessage(reason: unknown) {
+  const code = typeof reason === "object" && reason !== null && "code" in reason
+    ? String((reason as { code?: unknown }).code)
+    : "";
+
+  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+    return "The sign-in window was closed. Try again when you are ready.";
+  }
+  if (code === "auth/popup-blocked") {
+    return "Your browser blocked the Google sign-in window. Allow popups for this site and try again.";
+  }
+  if (code === "auth/unauthorized-domain") {
+    return `This domain is not authorized in Firebase. Add ${window.location.hostname} to Authentication → Settings → Authorized domains.`;
+  }
+  return "Google sign-in could not be completed. Try again or check the Firebase Authentication setup.";
 }
 
 function GoogleMark() {
