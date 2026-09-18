@@ -5,7 +5,8 @@ export interface ModelProviderConfig {
   apiKey: string;
   model: string;
   maxTokens: number;
-  extraHeaders?: Record<string, string>;
+  timeoutMs: number;
+  reasoningEffort?: "low";
   isZhipu?: boolean;
 }
 
@@ -21,23 +22,39 @@ class MultiModelRouter {
   // Provider-level concurrency locks (mutex) to avoid concurrent calls on single free keys
   private providerQueues: Map<string, Promise<void>> = new Map();
 
-  private enqueue(providerId: string, task: () => Promise<any>): Promise<any> {
-    const prev = this.providerQueues.get(providerId) || Promise.resolve();
-    let res: any;
-    const next = prev
-      .catch(() => {})
-      .then(async () => {
-        res = await task();
-      });
-    this.providerQueues.set(providerId, next);
-    return next.then(() => res);
+  private enqueue<T>(providerId: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.providerQueues.get(providerId) || Promise.resolve();
+    const run = previous.catch(() => undefined).then(task);
+    const tail = run.then(() => undefined, () => undefined);
+    this.providerQueues.set(providerId, tail);
+    void tail.finally(() => {
+      if (this.providerQueues.get(providerId) === tail) {
+        this.providerQueues.delete(providerId);
+      }
+    });
+    return run;
   }
 
   public getProviders(): ModelProviderConfig[] {
     const providers: ModelProviderConfig[] = [];
 
-    // Prefer the newer account/model. In real generation tests it completed a
-    // complex design prompt while the older flash endpoint timed out.
+    // Gemini is the fast primary path. Its OpenAI-compatible endpoint lets the
+    // rest of the failover pipeline keep one request/response contract.
+    const geminiKey = process.env.GEMINI_API_KEY?.trim() || "";
+    if (geminiKey) {
+      providers.push({
+        id: "gemini-2.5-flash",
+        name: "Google Gemini 2.5 Flash",
+        baseUrl: process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai",
+        apiKey: geminiKey,
+        model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+        maxTokens: parsePositiveInteger(process.env.GEMINI_MAX_TOKENS, 16_384),
+        timeoutMs: 90_000,
+        reasoningEffort: "low",
+      });
+    }
+
+    // First fallback: the newer GLM account/model.
     const zhipuKey2 = process.env.GLM_API_KEY_2 || "";
     if (zhipuKey2) {
       providers.push({
@@ -46,12 +63,13 @@ class MultiModelRouter {
         baseUrl: process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4",
         apiKey: zhipuKey2,
         model: process.env.GLM_MODEL_2 || "glm-4.7-flash",
-        maxTokens: parseInt(process.env.GLM_MAX_TOKENS || "16384", 10),
+        maxTokens: parsePositiveInteger(process.env.GLM_MAX_TOKENS, 16_384),
+        timeoutMs: 120_000,
         isZhipu: true,
       });
     }
 
-    // Fallback Zhipu account/model.
+    // Final fallback: the older GLM flash model.
     const zhipuKey1 = process.env.GLM_API_KEY || "";
     if (zhipuKey1) {
       providers.push({
@@ -60,38 +78,9 @@ class MultiModelRouter {
         baseUrl: process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4",
         apiKey: zhipuKey1,
         model: process.env.GLM_MODEL || "glm-4.5-flash",
-        maxTokens: parseInt(process.env.GLM_MAX_TOKENS || "16384", 10),
+        maxTokens: parsePositiveInteger(process.env.GLM_MAX_TOKENS, 16_384),
+        timeoutMs: 120_000,
         isZhipu: true,
-      });
-    }
-
-    // 3. Groq Cloud (Qwen 3.8-27B: 300+ tokens/sec hyper-speed)
-    const groqKey = process.env.GROQ_API_KEY || "";
-    if (groqKey) {
-      providers.push({
-        id: "groq-qwen",
-        name: "Groq Cloud (Qwen 3.8-27B)",
-        baseUrl: "https://api.groq.com/openai/v1",
-        apiKey: groqKey,
-        model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
-        maxTokens: 8192,
-      });
-    }
-
-    // 4. OpenRouter (inclusionai/ling-3.0-flash-vl:free)
-    const openRouterKey = process.env.OPENROUTER_API_KEY || "";
-    if (openRouterKey) {
-      providers.push({
-        id: "openrouter-ling",
-        name: "OpenRouter (Ling 3.0 Flash VL)",
-        baseUrl: "https://openrouter.ai/api/v1",
-        apiKey: openRouterKey,
-        model: process.env.OPENROUTER_MODEL || "inclusionai/ling-3.0-flash-vl:free",
-        maxTokens: 8192,
-        extraHeaders: {
-          "HTTP-Referer": "http://localhost:3000",
-          "X-Title": "BigBag AI App Builder",
-        },
       });
     }
 
@@ -106,7 +95,7 @@ class MultiModelRouter {
 
     if (providers.length === 0) {
       throw new Error(
-        "No AI API keys configured. Please configure GLM_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY."
+        "No AI API keys configured. Add GEMINI_API_KEY, GLM_API_KEY_2, or GLM_API_KEY."
       );
     }
 
@@ -119,7 +108,7 @@ class MultiModelRouter {
       console.log(`[MultiModelRouter] Attempting provider [${provider.name}] (${provider.model})...`);
 
       try {
-        const payload: Record<string, any> = {
+        const payload: Record<string, unknown> = {
           model: provider.model,
           messages,
           temperature: 0.2,
@@ -129,11 +118,13 @@ class MultiModelRouter {
         if (provider.isZhipu) {
           payload.thinking = { type: "disabled" };
         }
+        if (provider.reasoningEffort) {
+          payload.reasoning_effort = provider.reasoningEffort;
+        }
 
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${provider.apiKey}`,
-          ...(provider.extraHeaders || {}),
         };
 
         const res: Response = await this.enqueue(provider.id, () =>
@@ -141,12 +132,14 @@ class MultiModelRouter {
             method: "POST",
             headers,
             body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(120_000),
+            signal: AbortSignal.timeout(provider.timeoutMs),
           })
         );
 
         if (res.ok) {
-          const json = await res.json();
+          const json = await res.json() as {
+            choices?: Array<{ message?: { content?: string } }>;
+          };
           const text = json.choices?.[0]?.message?.content || "";
           if (!text || text.trim().length === 0) {
             throw new Error("Received empty response body from provider");
@@ -162,12 +155,12 @@ class MultiModelRouter {
 
         // Handle error responses
         const rawErr = await res.text();
-        let errMsg = rawErr;
+        let errMsg = `Request failed (${res.status})`;
         let isTrafficSpike = false;
         let isRateLimit = false;
 
         try {
-          const parsed = JSON.parse(rawErr);
+          const parsed = JSON.parse(rawErr) as { error?: { code?: string | number; message?: string } };
           const code = String(parsed.error?.code || "");
           const msg = String(parsed.error?.message || "");
 
@@ -180,7 +173,9 @@ class MultiModelRouter {
           } else if (parsed.error?.message) {
             errMsg = parsed.error.message;
           }
-        } catch {}
+        } catch {
+          if (rawErr.trim()) errMsg = rawErr.trim().slice(0, 300);
+        }
 
         const errSummary = `Provider [${provider.name}] HTTP ${res.status}: ${errMsg}`;
         console.warn(`[MultiModelRouter] ${errSummary}`);
@@ -198,8 +193,9 @@ class MultiModelRouter {
           console.log(`[MultiModelRouter] ${failoverMsg}`);
           onStatus?.(failoverMsg);
         }
-      } catch (err: any) {
-        const netErr = `Provider [${provider.name}] exception: ${err.message || String(err)}`;
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message : String(err);
+        const netErr = `Provider [${provider.name}] exception: ${detail}`;
         console.warn(`[MultiModelRouter] ${netErr}`);
         errors.push(netErr);
 
@@ -216,6 +212,13 @@ class MultiModelRouter {
       `All configured AI providers failed:\n` + errors.map((e) => `• ${e}`).join("\n")
     );
   }
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const candidate = value?.trim() || "";
+  if (!/^\d+$/.test(candidate)) return fallback;
+  const parsed = Number(candidate);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export const multiModelRouter = new MultiModelRouter();

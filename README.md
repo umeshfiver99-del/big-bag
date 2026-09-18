@@ -97,9 +97,12 @@ Create a `.env.local` file in the project root:
 ORCHESTRATOR_MODE=local
 SANDBOX_PROVIDER=local
 
-# Provide your preferred model key:
-GLM_API_KEY=your_glm_api_key
-# or GROQ_API_KEY / OPENROUTER_API_KEY
+# Primary model (fast path):
+GEMINI_API_KEY=your_gemini_api_key
+
+# Optional fallbacks, tried in this order:
+GLM_API_KEY_2=your_glm_4_7_key
+GLM_API_KEY=your_glm_4_5_key
 ```
 
 ### 3. Run it
@@ -120,9 +123,10 @@ Open **[http://localhost:3000](http://localhost:3000)**, type what you want to b
 | --- | :---: | --- |
 | `ORCHESTRATOR_MODE` | ⬜ Optional | Set to `local` to use the built-in multi-model local orchestrator. |
 | `SANDBOX_PROVIDER` | ⬜ Optional | Sandbox runtime (`local` or `e2b`). |
-| `GLM_API_KEY` | ⬜ Optional | Zhipu AI GLM key for code generation. |
-| `GROQ_API_KEY` | ⬜ Optional | Groq API key for fast inference. |
-| `OPENROUTER_API_KEY` | ⬜ Optional | OpenRouter API key for multi-model access. |
+| `GEMINI_API_KEY` | ⬜ Optional | Google Gemini API key. Gemini 2.5 Flash is the primary generation model. |
+| `GEMINI_MODEL` | ⬜ Optional | Gemini model override; defaults to `gemini-2.5-flash`. |
+| `GLM_API_KEY_2` | ⬜ Optional | First fallback key for GLM 4.7 Flash. |
+| `GLM_API_KEY` | ⬜ Optional | Final fallback key for GLM 4.5 Flash. |
 | `NEXT_PUBLIC_APP_URL` | ⬜ Optional | The public URL of your deployment, e.g. `https://your-domain.com`. |
 
 To start from the example file:
@@ -131,7 +135,7 @@ To start from the example file:
 cp .env.example .env.local
 ```
 
-> 🔒 **Security:** the API key is only read in `src/lib/vcaas-server.ts`, which never ships to the browser. It is deliberately **not** a `NEXT_PUBLIC_` variable.
+> 🔒 **Security:** AI provider keys are read only by server-side modules and never ship to the browser. They are deliberately **not** `NEXT_PUBLIC_` variables.
 
 ---
 

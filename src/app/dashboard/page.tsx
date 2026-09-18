@@ -22,10 +22,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus, Loader2, Trash2, SendHorizontal, Paperclip, X, ArrowUpRight, CopyCheck, DownloadCloud, FileDown,
   Search, Grid2X2, Rows3, SlidersHorizontal, ChevronLeft, ChevronRight,
-  AlertCircle, MoreVertical, AlertTriangle, CodeXml, LogOut, UserRound,
+  AlertCircle, MoreVertical, AlertTriangle, CodeXml, LogOut, UserRound, ChevronDown,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -371,11 +372,11 @@ export default function DashboardPage() {
   };
 
   const hasProjects = projects.length > 0;
+  const profileName = user?.displayName || user?.email?.split("@")[0] || "Your profile";
 
   return (
     <div className="dashboard-page min-h-screen relative overflow-hidden bg-background text-foreground transition-colors duration-200">
-      {/* Background ambient lighting */}
-      <div className="fixed inset-0 -z-10 bg-background pointer-events-none" />
+      <div className="dashboard-atmosphere" aria-hidden="true" />
 
       {/* Header */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/60">
@@ -386,24 +387,44 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle showLabel={false} />
-            {user && <span className="hidden md:inline-flex max-w-40 truncate text-xs text-muted-foreground">{user.email}</span>}
-            <button
-              className="w-8 h-8 grid place-items-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground"
-              title="Sign out"
-              aria-label="Sign out"
-              onClick={async () => { await logout(); router.push("/"); }}
-            >
-              {user?.photoURL ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.photoURL} alt="" className="size-6 rounded-md" referrerPolicy="no-referrer" />
-              ) : <UserRound className="size-4" />}
-              <LogOut className="sr-only" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="group flex h-9 items-center gap-2 rounded-xl border border-border bg-card/90 py-1 pl-1 pr-2 text-left shadow-xs transition-colors hover:bg-accent focus-visible:outline-none"
+                  aria-label="Open profile menu"
+                >
+                  <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-lg bg-primary/10 text-primary">
+                    {user?.photoURL ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={user.photoURL} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
+                    ) : <UserRound className="size-4" />}
+                  </span>
+                  <span className="hidden max-w-32 truncate text-xs font-medium sm:block">{profileName}</span>
+                  <ChevronDown className="hidden size-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 sm:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-xl border-border p-1.5 shadow-xl">
+                <DropdownMenuLabel className="px-2.5 py-2 font-normal">
+                  <span className="block text-sm font-semibold text-foreground">{profileName}</span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">{user?.email || "Signed in with Google"}</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="h-9 cursor-pointer rounded-lg px-2.5"
+                  onSelect={() => { void logout().then(() => router.push("/")); }}
+                >
+                  <LogOut className="size-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10">
         {/* Hero prompt */}
         {!loading && (
           <div className={hasProjects || keyConfigured === false ? "mb-10" : "flex flex-col items-center justify-center min-h-[50vh]"}>
