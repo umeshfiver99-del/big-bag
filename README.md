@@ -161,6 +161,7 @@ npm start          # serves on $PORT (default 3000)
 ```
 
 Set your model environment variables in the host's environment and point your process manager or container at `npm start`.
+Firebase web configuration is loaded from the running server, so Docker and Render may provide the documented `NEXT_PUBLIC_FIREBASE_*` values at container startup; they do not need to be baked into the image.
 
 ---
 

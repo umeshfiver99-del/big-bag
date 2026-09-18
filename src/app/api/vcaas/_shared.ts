@@ -35,7 +35,7 @@ function authResponse(status: 401 | 403 | 503, error: string, code: string) {
 }
 
 export async function resolveVcaasContext(): Promise<VcaasAuthResult> {
-  if (isLocalOrchestratorEnabled() && !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
+  if (isLocalOrchestratorEnabled() && !process.env["NEXT_PUBLIC_FIREBASE_PROJECT_ID"]) {
     const userId = "local-developer";
     return { ok: true, ctx: { accountUserId: userId }, team: { userId } };
   }

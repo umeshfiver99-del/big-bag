@@ -2,10 +2,11 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onIdTokenChanged, signOut, type User } from "firebase/auth";
-import { firebaseAuth, firebaseConfigured } from "@/lib/firebase-client";
+import { getFirebaseAuth } from "@/lib/firebase-client";
 
 interface AuthContextValue {
   configured: boolean;
+  configurationError: boolean;
   loading: boolean;
   user: User | null;
   logout: () => Promise<void>;
@@ -13,6 +14,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue>({
   configured: false,
+  configurationError: false,
   loading: true,
   user: null,
   logout: async () => {},
@@ -33,37 +35,59 @@ async function syncSession(user: User | null) {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(firebaseConfigured);
+  const [configured, setConfigured] = useState(false);
+  const [configurationError, setConfigurationError] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!firebaseAuth) {
-      setLoading(false);
-      return;
-    }
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-    return onIdTokenChanged(firebaseAuth, async (nextUser) => {
-      try {
-        await syncSession(nextUser);
-        setUser(nextUser);
-      } catch {
-        await signOut(firebaseAuth);
-        setUser(null);
-      } finally {
+    void getFirebaseAuth()
+      .then((firebaseAuth) => {
+        if (cancelled) return;
+        setConfigured(Boolean(firebaseAuth));
+        if (!firebaseAuth) {
+          setLoading(false);
+          return;
+        }
+
+        unsubscribe = onIdTokenChanged(firebaseAuth, async (nextUser) => {
+          try {
+            await syncSession(nextUser);
+            if (!cancelled) setUser(nextUser);
+          } catch {
+            await signOut(firebaseAuth);
+            if (!cancelled) setUser(null);
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setConfigurationError(true);
         setLoading(false);
-      }
-    });
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
-    configured: firebaseConfigured,
+    configured,
+    configurationError,
     loading,
     user,
     logout: async () => {
+      const firebaseAuth = await getFirebaseAuth().catch(() => null);
       if (firebaseAuth) await signOut(firebaseAuth);
       await syncSession(null);
       setUser(null);
     },
-  }), [loading, user]);
+  }), [configured, configurationError, loading, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

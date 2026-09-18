@@ -6,7 +6,7 @@ import { getAuth } from "firebase-admin/auth";
 function adminApp() {
   if (getApps().length > 0) return getApp();
 
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const projectId = process.env["NEXT_PUBLIC_FIREBASE_PROJECT_ID"];
   if (!projectId) throw new Error("Firebase project is not configured");
 
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
