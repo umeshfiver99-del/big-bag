@@ -110,6 +110,40 @@ function workspaceRepairContext(projectId: string): string {
   return chunks.join("\n\n");
 }
 
+function generationFailureMessage(error: unknown, restoredPreview: boolean): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  const preserved = restoredPreview
+    ? "\n\nYour previous working preview was restored, so no working code was lost."
+    : "";
+
+  if (detail.includes("No AI API keys configured")) {
+    return `Generation is not configured. Add GEMINI_API_KEY for the primary model, or a GLM fallback key, then retry.${preserved}`;
+  }
+  if (detail.includes("All configured AI providers failed")) {
+    return `No configured AI model completed the request. Check the Gemini/GLM key, quota, and provider availability, then retry.${preserved}`;
+  }
+  if (detail.includes("no valid source files") || detail.includes("required src/app/page.tsx") || detail.includes("placeholder source files")) {
+    return `The model returned incomplete source code after an automatic retry, so BigBag did not replace the project with a broken build. Retry the request once; if it repeats, make the prompt more specific.${preserved}`;
+  }
+
+  return `Generation stopped before a valid preview was ready. Check the server log for the technical cause, then retry the request.${preserved}`;
+}
+
+function repairFailureMessage(error: unknown, restoredPreview: boolean): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  const preserved = restoredPreview
+    ? " The previous working preview was restored, so no working code was lost."
+    : "";
+
+  if (detail.includes("All configured AI providers failed")) {
+    return `Automatic repair could not reach a configured AI model. Check the Gemini/GLM key, quota, and provider availability, then retry.${preserved}`;
+  }
+
+  return restoredPreview
+    ? `The requested change could not be compiled safely, so the previous working preview was restored. Retry or adjust the prompt; no working code was lost.`
+    : "Generation failed validation and a working preview could not be restored. Check the server log for the technical cause, then retry.";
+}
+
 
 function extractFilesFromMarkdown(text: string): Array<{ path: string; content: string }> {
   const files: Array<{ path: string; content: string }> = [];
@@ -517,9 +551,9 @@ export const localAgentEngine = {
           const warnMsg: ConversationMessage = {
             author: "agent",
             message: starterPreview
-              ? "⚠️ No AI API keys found in `.env.local`.\n\nPlease add your API keys to `.env.local` to enable full autonomous code generation. In the meantime, the starter template is running in the live preview."
-              : "No AI API keys are configured, and the starter preview could not be started. Add an AI provider key to `.env.local`, verify the sandbox configuration, and retry.",
-            messageType: starterPreview ? "finished" : "error",
+              ? "Generation is not configured. Add GEMINI_API_KEY for the primary model, or GLM_API_KEY_2 / GLM_API_KEY for failover, then retry. The starter template is available in the live preview."
+              : "Generation is not configured and the starter preview could not be started. Add GEMINI_API_KEY for the primary model, or a GLM fallback key, verify the sandbox configuration, then retry.",
+            messageType: "error",
             createdAt: new Date().toISOString(),
           };
           const currentConversation =
@@ -772,9 +806,7 @@ export const localAgentEngine = {
 
             newMessages.push({
               author: "agent",
-              message: restoredPreviewUrl
-                ? "The requested change could not be compiled safely, so the previous working version was restored. Please retry or adjust the prompt."
-                : `Generation failed validation and the preview could not be restored: ${repairError instanceof Error ? repairError.message : String(repairError)}`,
+              message: repairFailureMessage(repairError, Boolean(restoredPreviewUrl)),
               messageType: "error",
               createdAt: new Date().toISOString(),
             });
@@ -786,7 +818,7 @@ export const localAgentEngine = {
             });
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[localAgentEngine error]", err);
         if (previousWorkspace) restoreWorkspace(projectId, previousWorkspace);
         let restoredPreviewUrl: string | undefined;
@@ -798,7 +830,7 @@ export const localAgentEngine = {
         const current = localProjectStore.getRecord(projectId);
         const errorMsg: ConversationMessage = {
           author: "agent",
-          message: `Generation encountered an issue: ${err.message || String(err)}`,
+          message: generationFailureMessage(err, Boolean(restoredPreviewUrl)),
           messageType: "error",
           createdAt: new Date().toISOString(),
         };
